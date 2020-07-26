@@ -22,7 +22,10 @@ Redis database load for this was under 10% on a single t2.micro instance.
 ## Deployment
 The Application is deployed on AWS. See the following images for a schematic of the application- and network architecture:
 
+### Application Architecture
 ![AWS application architecture](/docs/aws_logical.png)
+
+### Network Architecture
 ![AWS network architecture](/docs/aws_network.png)
 
 # Development

@@ -24,8 +24,14 @@ async def send_lab_observations(lab: str, num_requests=2880, step_seconds=30):
             temps.append(data['temp'])
             humidities.append(data['humidity'])
 
-            async with session.post(TARGET_URL, json=data) as response:
-                if not response.status == 200:
+            for i in range(3):
+                async with session.post(TARGET_URL, json=data) as response:
+                    if response.status == 200:
+                        break
+                    if response.status >= 500:
+                        await asyncio.sleep(2)
+                        continue
+
                     raise Exception(await response.text())
 
     print(f'{lab}: TEMP: {sum(temps) / len(temps):.3f} | HUM: {sum(humidities) / len(humidities):.3f}')
