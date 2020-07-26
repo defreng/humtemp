@@ -28,3 +28,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+print('Running with Settings:')
+print(settings.json(indent=2))

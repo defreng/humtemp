@@ -8,7 +8,7 @@ It is designed to easily scale to 100.000s of metrics pushes per second with the
 The application can be configured using environment variables (which are specified in `src/humtemp/configuration.py`):
 
 * `HUMTEMP_REDIS_HOST`: Hostname of the Redis instance to connect to (default: localhost)
-* `HUMTEMP_REDIS_PORT`: Port of the Redis instance`(default: 6379)
+* `HUMTEMP_REDIS_PORT`: Port of the Redis instance (default: 6379)
 * `HUMTEMP_REDIS_DB`: DB index in Redis which should be used (default: 0)
 * `HUMTEMP_BUCKET_OFFSET`: humtemp divides the time into buckets. Bucket boundaries will be aligned to this offset. Use ISO-8601 notation. (Default: `1970-01-01T00:00:00+00:00`)
 * `HUMTEMP_BUCKET_DURATION`: How large (in terms of duration) every bucket is in seconds (Default: `86400` [1 day])
@@ -48,10 +48,16 @@ poetry run python -m uvicorn humtemp.main:app --reload
 
 ## Local Testing
 ```
-poetry run pytest tests/
+# unit tests
+poetry run pytest tests/unit
+
+# integration tests
+# (require running redis at localhost:6379)
+poetry run pytest tests/integration
+
+# load test
+poetry run python tests_manual/loadtest.py
 ```
- 
-The integration tests need a local redis database to be running. See below at "Local Deployment" how to set one up.
 
 ## Local Deployment
 It's easiest to utilize `docker-compose` to build the image and deploy it locally, including the necessary Redis database:
@@ -72,7 +78,7 @@ docker tag humtemp:latest 718314285581.dkr.ecr.us-east-1.amazonaws.com/humtemp:l
 docker push 718314285581.dkr.ecr.us-east-1.amazonaws.com/humtemp:latest
 ```
 
-Unfortunately, I wasn't able to do further automation of the infrastructure setup due to time constraints - although I would love to see a fully automated, "every-commit-to-production" pipeline using tools like terraform or the AWS cli.
+Unfortunately, I wasn't able to implement further automation of the infrastructure setup and deployment due to time constraints - although I would love to see a fully automated, "every-commit-to-production" pipeline using tools like terraform or the AWS cli.
 
 This would also make it a lot easier to no longer use the terrible ":latest" tag on the Docker images for more reproducible deployments and rollback options.
 
@@ -85,14 +91,26 @@ In general, the task itself would also fit nicely into the serverless AWS Lambda
 The main concern with this service is to achieve sufficient performance with minimal cost. At the same time, the usecase doesn't require support for classical ACID transactions - and it is tolerable to lose a few seconds of data in case of database instance failures.
 
 This lead to the choice of the Redis in-memory key-value store as database backend for the application:
-* The amount of data that is stored is small (~ 50k rows per day, A few bytes per row). This can easily be held in memory.
+* The amount of data that is stored is small (~ 50k rows per day, a few bytes per row). This can easily be held in memory.
 * Redis offers great performance for given hardware resources
 * Redis offers persistence to disk and cluster functionality to support failure recovery and future horitzontal scaling options
 * AWS offers a managed Redis service (AWS ElastiCache)
 
-Currently, the Redis database implementation in the "humtemp" microservice is the limiting factor in scaling this application, as only a single-instance Redis deployment is supported.
+Currently, the Redis database implementation in the "humtemp" microservice is the limiting factor in scaling this application horizontally, as only a single-instance Redis deployment is supported.
 
-If necessary, this limitation can be relaxed to **infinite horizontal scalability** by adding support for multiple, independent Redis database instances. This can be easily achieved by sharding buckets to individual Redis instances (for example based on hashes of the lab identifier).
+If necessary, this limitation can be relaxed to allow **infinite horizontal scalability** by adding support for multiple, independent Redis database instances. This can be easily achieved by sharding buckets to individual Redis instances (for example based on hashes of the lab identifier).
+
+## API Types
+There are multiple options for providing identifiers for the labs:
+* Auto-incrementing integer keys
+* Random UUIDs
+* User-chosen natural IDs
+
+Auto-incrementing integer keys are popular in relation database, but they require an additional synchronization step, which would add overhead and complexity.
+
+Instead, humtemp allows the user (posting sensor data) to specify an (almost) arbitrary string as lab identifier. It will automatically be added to the DB if it didn't exist so far.
+
+With this choice, it is up to the user if he wants to specify a human-readable lab identifer (like a combination of building and room number), or a device-generated, random UUID identifier for minimal setup.
 
 ## Data Model
 Redis requires a flat data model.
@@ -112,8 +130,10 @@ There are separate buckets for every lab ID. The individual bucket identifier co
 All the normal monitoring should be done for the application deployment. By this I mean things like:
 * Number of available instances (health check using `/summary` API)
 * CPU and memory utilization of every instance
-* Number of successful (=status code 200) / failed requests
+* Number of successful (=status code 200) or failed requests
 
 However, the CPU and memory utilization, as well as the number of requests will be very spiky. Therefore, it will be hard to define fixed thresholds for alerting.
 
-So it would make sense to look at these metrics (especially the number of successful requests) at a daily granularity, e.g. "number of successful requests / day", as this number should be fairly constant.
+So it would make sense to look at these metrics (especially the number of successful requests) at a daily granularity, e.g. "number of successful requests / day", as this number should be fairly constant. The failures could be evaluated with a finer granularity.
+
+Additionally, the application could provide custom metrics. For example "total number of observations" stored in the database. This should also be fairly stable over time.
