@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "humtemp"
+version = "0.1.0"
+description = ""
+authors = ["Alexander Hungenberg <Alexander.Hungenberg@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+fastapi = "^0.60.1"
+uvicorn = "^0.11.6"
+redis = "^3.5.3"
+gunicorn = "^20.0.4"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.4.3"
+coverage = "^5.2.1"
+requests = "^2.24.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
