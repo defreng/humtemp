@@ -1,8 +1,5 @@
 from datetime import datetime, timezone, date, time, timedelta
 
-from humtemp.configuration import settings
-settings.humtemp_redis_host = 'localhost'
-
 from fastapi.testclient import TestClient
 
 from humtemp.main import app

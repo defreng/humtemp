@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import *
 
 from pydantic import BaseModel, validator
@@ -34,7 +34,9 @@ class Observation(BaseModel):
         except Exception:
             raise ValueError('not a valid timestamp')
 
-        if dt > datetime.now(tz=timezone.utc):
-            raise ValueError('observations from the future are not allowed')
+        now = int((datetime.now() + timedelta(minutes=1)).timestamp())
+        if timestamp > now:
+            raise ValueError(f'observations from the future are not allowed. '
+                             f'Observation timestamp: {timestamp}. Current timestamp: {now}')
 
         return timestamp

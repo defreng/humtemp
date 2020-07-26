@@ -1,4 +1,4 @@
-FROM python:3.8-slim as python-base
+FROM python:3.8-slim as builder
 
 ENV PYTHONUNBUFFERED=1 \
     # prevents python creating .pyc files
@@ -28,9 +28,6 @@ ENV PYTHONUNBUFFERED=1 \
 # prepend poetry and venv to path
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
-
-# `builder-base` stage is used to build deps + create our virtual environment
-FROM python-base as builder-base
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         # deps for installing poetry
@@ -50,8 +47,11 @@ RUN poetry install --no-dev
 
 
 # `production` image used for runtime
-FROM python-base as production
+FROM builder as production
 
-ENV FASTAPI_ENV=production
-COPY --from=builder-base $PYSETUP_PATH $PYSETUP_PATH
+COPY --from=builder $PYSETUP_PATH $PYSETUP_PATH
+
+COPY ./src /app/
+WORKDIR /app
+
 CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "-b", "0.0.0.0:8000", "humtemp.main:app"]
